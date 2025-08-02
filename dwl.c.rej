@@ -1,0 +1,10 @@
+--- dwl.c
++++ dwl.c
+@@ -318,6 +318,7 @@ static void setcursor(struct wl_listener *listener, void *data);
+ static void setcursorshape(struct wl_listener *listener, void *data);
+ static void setfloating(Client *c, int floating);
+ static void setfullscreen(Client *c, int fullscreen);
++static void setfakefullscreen(Client *c, int fullscreen);
+ static void setgamma(struct wl_listener *listener, void *data);
+ static void setlayout(const Arg *arg);
+ static void setmfact(const Arg *arg);
