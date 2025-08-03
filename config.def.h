@@ -34,7 +34,7 @@ static const Env envs[] = {
 static const char *const autostart[] = {
 		"dbus-update-activation-environment", "WAYLAND_DISPLAY", "XDG_CURRENT_DESKTOP", NULL,
 		"pipewire", NULL,
-		"swww-daemon", "--no-cache", NULL,
+		"swww-daemon", NULL,
 		"hyprlock", NULL,
 		"hypridle", NULL,
 		"wl-paste", "--type", "text", "--watch", "cliphist", "store", NULL,
@@ -136,7 +136,7 @@ static const uint32_t send_events_mode = LIBINPUT_CONFIG_SEND_EVENTS_ENABLED;
 LIBINPUT_CONFIG_ACCEL_PROFILE_FLAT
 LIBINPUT_CONFIG_ACCEL_PROFILE_ADAPTIVE
 */
-static const enum libinput_config_accel_profile accel_profile = LIBINPUT_CONFIG_ACCEL_PROFILE_ADAPTIVE;
+static const enum libinput_config_accel_profile accel_profile = LIBINPUT_CONFIG_ACCEL_PROFILE_FLAT;
 static const double accel_speed = 0.0;
 
 /* You can choose between:
@@ -172,6 +172,16 @@ static const char *clipboard[] = { "/bin/bash", "-c", "$HOME/.config/bash/clipbo
 static const char *calculator[] = { "rofi", "-show", "calc", "-modi", "calc", "-no-show-match", "-no-sort", NULL };
 static const char *colorpicker[] = { "hyprpicker", "-a", NULL };
 static const char *switchaudio[] = { "/bin/bash", "-c", "$HOME/.config/bin/switchaudio", NULL };
+static const char *screenshotscr[] = { "/bin/bash", "-c", "$HOME/.config/bash/screenshotscr", NULL };
+static const char *screenshotwin[] = { "/bin/bash", "-c", "$HOME/.config/bash/screenshotwin", NULL };
+
+static const char *raisevolume[] = { "swayosd-client", "--output-volume", "+5", NULL };
+static const char *lowervolume[] = { "swayosd-client", "--output-volume", "-5", NULL };
+static const char *muteoutput[] = { "swayosd-client", "--output-volume", "mute-toggle", NULL };
+static const char *muteinput[] = { "swayosd-client", "--input-volume", "mute-toggle", NULL };
+
+static const char *raisebright[] = { "swayosd-client", "--brightness", "+5", NULL };
+static const char *lowerbright[] = { "swayosd-client", "--brightness", "-5", NULL };
 
 static const Key keys[] = {
 	/* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
@@ -188,6 +198,14 @@ static const Key keys[] = {
 	{ MODKEY,                    XKB_KEY_c,			 spawn,          {.v = calculator} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_C,			 spawn,          {.v = colorpicker} },
 	{ MODKEY,					 XKB_KEY_o,			 spawn,			 {.v = switchaudio} },
+	{ MODKEY,					 XKB_KEY_p,			 spawn,			 {.v = screenshotscr} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_P,			 spawninfo,		 {.v = screenshotwin} },
+	{ MODKEY,					 XKB_KEY_comma,		 spawn,			 {.v = lowervolume} },
+	{ MODKEY,					 XKB_KEY_period,	 spawn,			 {.v = raisevolume} },
+	{ MODKEY,					 XKB_KEY_m,			 spawn,			 {.v = muteoutput} },
+	{ MODKEY,					 XKB_KEY_less,		 spawn,			 {.v = lowerbright} },
+	{ MODKEY,					 XKB_KEY_greater,	 spawn,			 {.v = raisebright} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_M,			 spawn,			 {.v = muteinput} },
 	{ MODKEY,                    XKB_KEY_j,          focusstack,     {.i = -1} },
 	{ MODKEY,                    XKB_KEY_k,          focusstack,     {.i = +1} },
 	{ MODKEY,                    XKB_KEY_plus,       incnmaster,     {.i = +1} },
@@ -208,10 +226,10 @@ static const Key keys[] = {
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_F,			 togglefakefullscreen, {0} },
 	{ MODKEY,                    XKB_KEY_0,          view,           {.ui = ~0} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_parenright, tag,            {.ui = ~0} },
-	{ MODKEY,                    XKB_KEY_comma,      focusmon,       {.i = WLR_DIRECTION_LEFT} },
-	{ MODKEY,                    XKB_KEY_period,     focusmon,       {.i = WLR_DIRECTION_RIGHT} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_less,       tagmon,         {.i = WLR_DIRECTION_LEFT} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_greater,    tagmon,         {.i = WLR_DIRECTION_RIGHT} },
+	{ MODKEY,                    XKB_KEY_bracketleft,      focusmon,       {.i = WLR_DIRECTION_LEFT} },
+	{ MODKEY,                    XKB_KEY_bracketright,     focusmon,       {.i = WLR_DIRECTION_RIGHT} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_braceleft,       tagmon,         {.i = WLR_DIRECTION_LEFT} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_braceright,    tagmon,         {.i = WLR_DIRECTION_RIGHT} },
 	TAGKEYS(          XKB_KEY_1, XKB_KEY_exclam,                     0),
 	TAGKEYS(          XKB_KEY_2, XKB_KEY_at,                         1),
 	TAGKEYS(          XKB_KEY_3, XKB_KEY_numbersign,                 2),
