@@ -21,14 +21,25 @@ static const float fullscreen_bg[]         = {0.0f, 0.0f, 0.0f, 1.0f}; /* You ca
 /* logging */
 static int log_level = WLR_ERROR;
 
+static const Env envs[] = {
+	/* variable			value */
+	{ "XDG_CURRENT_DESKTOP",	"wlroots" },
+	{ "XDG_SESSION_TYPE",		"wayland" },
+	{ "DESKTOP_SESSION",		"wlroots" },
+	{ "QT_QPA_PLATFORMTHEME",	"qt6ct"	  },
+	{ "ADW_DISABLE_PORTAL",		"1"		  },
+};
+
 /* Autostart */
 static const char *const autostart[] = {
-		"swww-daemon", NULL,
+		"dbus-update-activation-environment", "WAYLAND_DISPLAY", "XDG_CURRENT_DESKTOP", NULL,
+		"pipewire", NULL,
+		"swww-daemon", "--no-cache", NULL,
 		"hyprlock", NULL,
 		"hypridle", NULL,
-		"mako", NULL,
 		"wl-paste", "--type", "text", "--watch", "cliphist", "store", NULL,
 		"wl-paste", "--type", "image", "--watch", "cliphist", "store", NULL,
+		"setsid", "mako", NULL,
 		"swayosd-server", NULL,
 		"/bin/bash", "-c", "$HOME/.config/bash/battery-alert", NULL,
 		"/bin/bash", "-c", "$HOME/.config/bash/refresh", NULL,
@@ -83,8 +94,8 @@ static const MonitorRule monrules[] = {
 static const struct xkb_rule_names xkb_rules = {
 	/* can specify fields: rules, model, layout, variant, options */
 	/* example:
-	.options = "ctrl:nocaps",
 	*/
+	.options = "ctrl:nocaps",
 	.options = NULL,
 };
 
@@ -134,6 +145,8 @@ LIBINPUT_CONFIG_TAP_MAP_LMR -- 1/2/3 finger tap maps to left/middle/right
 */
 static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TAP_MAP_LRM;
 
+static const int cursor_timeout = 5;
+
 /* If you want to use the windows key for MODKEY, use WLR_MODIFIER_LOGO */
 #define MODKEY WLR_MODIFIER_ALT
 
@@ -148,14 +161,29 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 
 /* commands */
 static const char *terminal[] = { "alacritty", NULL };
+static const char *explorer[] = { "nemo", NULL };
 static const char *launcher[] = { "rofi", "-show", "drun", NULL };
+static const char *browsing[] = { "google-chrome-stable", NULL };
+static const char *refreshb[] = { "/bin/bash", "-c", "$HOME/.config/bash/refresh", NULL };
+static const char *rofimoji[] = { "/bin/bash", "-c", "$HOME/.config/bash/rofimoji", NULL };
+static const char *poweropt[] = { "/bin/bash", "-c", "$HOME/.config/bash/powermenu", NULL };
+static const char *clipboard[] = { "/bin/bash", "-c", "$HOME/.config/bash/clipboard", NULL };
+static const char *calculator[] = { "rofi", "-show", "calc", "-modi", "calc", "-no-show-match", "-no-sort", NULL };
+static const char *switchaudio[] = { "/bin/bash", "-c", "$HOME/.config/bin/switchaudio", NULL };
 
 static const Key keys[] = {
 	/* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
 	/* modifier                  key                 function        argument */
-	{ MODKEY,                    XKB_KEY_a,          spawn,          {.v = launcher} },
 	{ MODKEY,					 XKB_KEY_t,			 spawn,          {.v = terminal} },
-	{ MODKEY,                    XKB_KEY_b,          toggletag,      {0} },
+	{ MODKEY,					 XKB_KEY_e,			 spawn,          {.v = explorer} },
+	{ MODKEY,                    XKB_KEY_a,          spawn,          {.v = launcher} },
+	{ MODKEY,                    XKB_KEY_b,          spawn,          {.v = browsing} },
+	{ MODKEY,                    XKB_KEY_r,          spawn,          {.v = refreshb} },
+	{ MODKEY,                    XKB_KEY_slash,      spawn,          {.v = rofimoji} },
+	{ MODKEY,                    XKB_KEY_BackSpace,  spawn,          {.v = poweropt} },
+	{ MODKEY,                    XKB_KEY_v,			 spawn,          {.v = clipboard} },
+	{ MODKEY,                    XKB_KEY_c,			 spawn,          {.v = calculator} },
+	{ MODKEY,					 XKB_KEY_o,			 spawn,			 {.v = switchaudio} },
 	{ MODKEY,                    XKB_KEY_j,          focusstack,     {.i = -1} },
 	{ MODKEY,                    XKB_KEY_k,          focusstack,     {.i = +1} },
 	{ MODKEY,                    XKB_KEY_plus,       incnmaster,     {.i = +1} },
@@ -164,14 +192,16 @@ static const Key keys[] = {
 	{ MODKEY,                    XKB_KEY_l,          setmfact,       {.f = +0.05f} },
 	{ MODKEY,                    XKB_KEY_Return,     zoom,           {0} },
 	{ MODKEY,                    XKB_KEY_Tab,        view,           {0} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_C,          killclient,     {0} },
-	{ MODKEY,                    XKB_KEY_u,          setlayout,      {.v = &layouts[0]} },
-	{ MODKEY,                    XKB_KEY_f,          setlayout,      {.v = &layouts[1]} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Q,          killclient,     {0} },
+	/*
+	{ MODKEY,                    XKB_KEY_w,          setlayout,      {.v = &layouts[0]} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_W,          setlayout,      {.v = &layouts[1]} },
 	{ MODKEY,                    XKB_KEY_m,          setlayout,      {.v = &layouts[2]} },
 	{ MODKEY,                    XKB_KEY_space,      setlayout,      {0} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_space,      togglefloating, {0} },
-	{ MODKEY,                    XKB_KEY_e,			 togglefullscreen, {0} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_E,      togglefakefullscreen, {0} },
+	*/
+	{ MODKEY,					 XKB_KEY_w,			 togglefloating, {0} },
+	{ MODKEY,                    XKB_KEY_f,			 togglefullscreen, {0} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_F,			 togglefakefullscreen, {0} },
 	{ MODKEY,                    XKB_KEY_0,          view,           {.ui = ~0} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_parenright, tag,            {.ui = ~0} },
 	{ MODKEY,                    XKB_KEY_comma,      focusmon,       {.i = WLR_DIRECTION_LEFT} },
@@ -187,7 +217,7 @@ static const Key keys[] = {
 	TAGKEYS(          XKB_KEY_7, XKB_KEY_ampersand,                  6),
 	TAGKEYS(          XKB_KEY_8, XKB_KEY_asterisk,                   7),
 	TAGKEYS(          XKB_KEY_9, XKB_KEY_parenleft,                  8),
-	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Q,          quit,           {0} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Delete,          quit,           {0} },
 
 	/* Ctrl-Alt-Backspace and Ctrl-Alt-Fx used to be handled by X server */
 	{ WLR_MODIFIER_CTRL|WLR_MODIFIER_ALT,XKB_KEY_Terminate_Server, quit, {0} },

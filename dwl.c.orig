@@ -137,8 +137,9 @@ typedef struct {
 #endif
 	unsigned int bw;
 	uint32_t tags;
-	int isfloating, isurgent, isfullscreen;
+	int isfloating, isurgent, isfullscreen, isfakefullscreen;
 	uint32_t resize; /* configure serial of a pending resize */
+	pid_t pid;
 } Client;
 
 typedef struct {
@@ -229,6 +230,11 @@ typedef struct {
 	int isfloating;
 	int monitor;
 } Rule;
+
+typedef struct {
+	const char *variable;
+	const char *value;
+} Env;
 
 typedef struct {
 	struct wlr_scene_tree *scene;
@@ -324,6 +330,7 @@ static void setcursor(struct wl_listener *listener, void *data);
 static void setcursorshape(struct wl_listener *listener, void *data);
 static void setfloating(Client *c, int floating);
 static void setfullscreen(Client *c, int fullscreen);
+static void setfakefullscreen(Client *c, int fullscreen);
 static void setlayout(const Arg *arg);
 static void setmfact(const Arg *arg);
 static void setmon(Client *c, Monitor *m, uint32_t newtags);
@@ -331,12 +338,14 @@ static void setpsel(struct wl_listener *listener, void *data);
 static void setsel(struct wl_listener *listener, void *data);
 static void setup(void);
 static void spawn(const Arg *arg);
+static void spawninfo(const Arg *arg);
 static void startdrag(struct wl_listener *listener, void *data);
 static void tag(const Arg *arg);
 static void tagmon(const Arg *arg);
 static void tile(Monitor *m);
 static void togglefloating(const Arg *arg);
 static void togglefullscreen(const Arg *arg);
+static void togglefakefullscreen(const Arg *arg);
 static void toggletag(const Arg *arg);
 static void toggleview(const Arg *arg);
 static void unlocksession(struct wl_listener *listener, void *data);
@@ -492,6 +501,8 @@ applyrules(Client *c)
 
 	appid = client_get_appid(c);
 	title = client_get_title(c);
+
+	c->pid = client_get_pid(c);
 
 	for (r = rules; r < END(rules); r++) {
 		if ((!r->title || strstr(title, r->title))
@@ -2173,6 +2184,17 @@ pointerfocus(Client *c, struct wlr_surface *surface, double sx, double sy,
 }
 
 void
+setfakefullscreen(Client *c, int fullscreen)
+{
+	c->isfakefullscreen = fullscreen;
+	if (!c->mon)
+		return;
+	if (c->isfullscreen)
+		setfullscreen(c, 0);
+	client_set_fullscreen(c, fullscreen);
+}
+
+void
 printstatus(void)
 {
 	Monitor *m = NULL;
@@ -2330,6 +2352,8 @@ run(char *startup_cmd)
 	if (!socket)
 		die("startup: display_add_socket_auto");
 	setenv("WAYLAND_DISPLAY", socket, 1);
+	for (size_t i = 0; i < LENGTH(envs); i++)
+		setenv(envs[i].variable, envs[i].value, 1);
 
 	/* Start the backend. This will enumerate outputs and inputs, become the DRM
 	 * master, etc */
@@ -2766,6 +2790,44 @@ spawn(const Arg *arg)
 }
 
 void
+spawninfo(const Arg *arg)
+{
+	int fd[2];
+	pid_t pid;
+	const char *title, *appid;
+	Client *c = focustop(selmon);
+
+	if (pipe(fd) == -1)
+		return;
+	if ((pid = fork()) == -1)
+		return;
+	if (pid == 0) {
+		dup2(fd[0], STDIN_FILENO);
+		close(fd[0]);
+		close(fd[1]);
+		dup2(STDERR_FILENO, STDOUT_FILENO);
+		setsid();
+		execvp(((char **)arg->v)[0], (char **)arg->v);
+		die("dwl: execvp %s failed:", ((char **)arg->v)[0]);
+	}
+
+	close(fd[0]);
+
+	if (c) {
+		if (!(title = client_get_title(c)))
+			title = "";
+		if (!(appid = client_get_appid(c)))
+			appid = "";
+		dprintf(fd[1], "%d\n%s\n%s\n%"PRIu32"\n%d,%d %dx%d\n", c->pid,
+				title, appid, c->tags,
+				c->geom.x + c->bw, c->geom.y + c->bw,
+				c->geom.width - 2 * c->bw, c->geom.height - 2 * c->bw);
+	}
+
+	close(fd[1]);
+}
+
+void
 startdrag(struct wl_listener *listener, void *data)
 {
 	struct wlr_drag *drag = data;
@@ -2848,6 +2910,14 @@ togglefullscreen(const Arg *arg)
 	Client *sel = focustop(selmon);
 	if (sel)
 		setfullscreen(sel, !sel->isfullscreen);
+}
+
+void
+togglefakefullscreen(const Arg *arg)
+{
+	Client *sel = focustop(selmon);
+	if (sel)
+		setfakefullscreen(sel, !sel->isfakefullscreen);
 }
 
 void

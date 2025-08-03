@@ -21,9 +21,24 @@ static const float fullscreen_bg[]         = {0.0f, 0.0f, 0.0f, 1.0f}; /* You ca
 /* logging */
 static int log_level = WLR_ERROR;
 
+static const Env envs[] = {
+	/* variable			value */
+	{ "XDG_CURRENT_DESKTOP",	"wlroots" },
+};
+
 /* Autostart */
 static const char *const autostart[] = {
-        "wbg", "/path/to/your/image", NULL,
+		"dbus-update-activation-environment", "WAYLAND_DISPLAY", "XDG_CURRENT_DESKTOP", NULL,
+		"pipewire", NULL,
+		"swww-daemon", "--no-cache", NULL,
+		"hyprlock", NULL,
+		"hypridle", NULL,
+		"wl-paste", "--type", "text", "--watch", "cliphist", "store", NULL,
+		"wl-paste", "--type", "image", "--watch", "cliphist", "store", NULL,
+		"setsid", "mako", NULL,
+		"swayosd-server", NULL,
+		"/bin/bash", "-c", "$HOME/.config/bash/battery-alert", NULL,
+		"/bin/bash", "-c", "$HOME/.config/bash/refresh", NULL,
         NULL /* terminate */
 };
 
@@ -163,6 +178,7 @@ static const Key keys[] = {
 	{ MODKEY,                    XKB_KEY_space,      setlayout,      {0} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_space,      togglefloating, {0} },
 	{ MODKEY,                    XKB_KEY_e,			 togglefullscreen, {0} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_E,      togglefakefullscreen, {0} },
 	{ MODKEY,                    XKB_KEY_0,          view,           {.ui = ~0} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_parenright, tag,            {.ui = ~0} },
 	{ MODKEY,                    XKB_KEY_comma,      focusmon,       {.i = WLR_DIRECTION_LEFT} },

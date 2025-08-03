@@ -139,6 +139,7 @@ typedef struct {
 	uint32_t tags;
 	int isfloating, isurgent, isfullscreen, isfakefullscreen;
 	uint32_t resize; /* configure serial of a pending resize */
+	pid_t pid;
 } Client;
 
 typedef struct {
@@ -231,6 +232,11 @@ typedef struct {
 } Rule;
 
 typedef struct {
+	const char *variable;
+	const char *value;
+} Env;
+
+typedef struct {
 	struct wlr_scene_tree *scene;
 
 	struct wlr_session_lock_v1 *lock;
@@ -289,6 +295,8 @@ static void focusstack(const Arg *arg);
 static Client *focustop(Monitor *m);
 static void fullscreennotify(struct wl_listener *listener, void *data);
 static void gpureset(struct wl_listener *listener, void *data);
+static void handlecursoractivity(void);
+static int hidecursor(void *data);
 static void handlesig(int signo);
 static void incnmaster(const Arg *arg);
 static void inputdevice(struct wl_listener *listener, void *data);
@@ -332,6 +340,7 @@ static void setpsel(struct wl_listener *listener, void *data);
 static void setsel(struct wl_listener *listener, void *data);
 static void setup(void);
 static void spawn(const Arg *arg);
+static void spawninfo(const Arg *arg);
 static void startdrag(struct wl_listener *listener, void *data);
 static void tag(const Arg *arg);
 static void tagmon(const Arg *arg);
@@ -392,6 +401,14 @@ static struct wlr_pointer_constraint_v1 *active_constraint;
 
 static struct wlr_cursor *cursor;
 static struct wlr_xcursor_manager *cursor_mgr;
+static struct wl_event_source *hide_source;
+static bool cursor_hidden = false;
+static struct {
+	enum wp_cursor_shape_device_v1_shape shape;
+	struct wlr_surface *surface;
+	int hotspot_x;
+	int hotspot_y;
+} last_cursor;
 
 static struct wlr_scene_rect *root_bg;
 static struct wlr_session_lock_manager_v1 *session_lock_mgr;
@@ -494,6 +511,8 @@ applyrules(Client *c)
 
 	appid = client_get_appid(c);
 	title = client_get_title(c);
+
+	c->pid = client_get_pid(c);
 
 	for (r = rules; r < END(rules); r++) {
 		if ((!r->title || strstr(title, r->title))
@@ -640,8 +659,9 @@ axisnotify(struct wl_listener *listener, void *data)
 	 * for example when you move the scroll wheel. */
 	struct wlr_pointer_axis_event *event = data;
 	wlr_idle_notifier_v1_notify_activity(idle_notifier, seat);
-	/* TODO: allow usage of scroll wheel for mousebindings, it can be implemented
-	 * by checking the event's orientation and the delta of the event */
+	handlecursoractivity();
+	/* TODO: allow usage of scroll whell for mousebindings, it can be implemented
+	 * checking the event's orientation and the delta of the event */
 	/* Notify the client with pointer focus of the axis event. */
 	wlr_seat_pointer_notify_axis(seat,
 			event->time_msec, event->orientation, event->delta,
@@ -658,6 +678,7 @@ buttonpress(struct wl_listener *listener, void *data)
 	const Button *b;
 
 	wlr_idle_notifier_v1_notify_activity(idle_notifier, seat);
+	handlecursoractivity();
 
 	switch (event->state) {
 	case WL_POINTER_BUTTON_STATE_PRESSED:
@@ -1625,6 +1646,32 @@ handlesig(int signo)
 }
 
 void
+handlecursoractivity(void)
+{
+	wl_event_source_timer_update(hide_source, cursor_timeout * 1000);
+
+	if (!cursor_hidden)
+		return;
+
+	cursor_hidden = false;
+
+	if (last_cursor.shape)
+		wlr_cursor_set_xcursor(cursor, cursor_mgr,
+				wlr_cursor_shape_v1_name(last_cursor.shape));
+	else
+		wlr_cursor_set_surface(cursor, last_cursor.surface,
+				last_cursor.hotspot_x, last_cursor.hotspot_y);
+}
+
+int
+hidecursor(void *data)
+{
+	wlr_cursor_unset_image(cursor);
+	cursor_hidden = true;
+	return 1;
+}
+
+void
 incnmaster(const Arg *arg)
 {
 	if (!arg || !selmon)
@@ -1968,6 +2015,7 @@ motionnotify(uint32_t time, struct wlr_input_device *device, double dx, double d
 
 		wlr_cursor_move(cursor, device, dx, dy);
 		wlr_idle_notifier_v1_notify_activity(idle_notifier, seat);
+		handlecursoractivity();
 
 		/* Update selmon (even while dragging a window) */
 		if (sloppyfocus)
@@ -2008,7 +2056,7 @@ motionnotify(uint32_t time, struct wlr_input_device *device, double dx, double d
 	/* If there's no client surface under the cursor, set the cursor image to a
 	 * default. This is what makes the cursor image appear when you move it
 	 * off of a client or over its border. */
-	if (!surface && !seat->drag)
+	if (!surface && !seat->drag && !cursor_hidden)
 		wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
 
 	pointerfocus(c, surface, sx, sy, time);
@@ -2343,6 +2391,8 @@ run(char *startup_cmd)
 	if (!socket)
 		die("startup: display_add_socket_auto");
 	setenv("WAYLAND_DISPLAY", socket, 1);
+	for (size_t i = 0; i < LENGTH(envs); i++)
+		setenv(envs[i].variable, envs[i].value, 1);
 
 	/* Start the backend. This will enumerate outputs and inputs, become the DRM
 	 * master, etc */
@@ -2389,6 +2439,7 @@ run(char *startup_cmd)
 	 * monitor when displayed here */
 	wlr_cursor_warp_closest(cursor, NULL, cursor->x, cursor->y);
 	wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
+	handlecursoractivity();
 
 	/* Run the Wayland event loop. This does not return until you exit the
 	 * compositor. Starting the backend rigged up all of the necessary event
@@ -2412,9 +2463,16 @@ setcursor(struct wl_listener *listener, void *data)
 	 * use the provided surface as the cursor image. It will set the
 	 * hardware cursor on the output that it's currently on and continue to
 	 * do so as the cursor moves between outputs. */
-	if (event->seat_client == seat->pointer_state.focused_client)
-		wlr_cursor_set_surface(cursor, event->surface,
-				event->hotspot_x, event->hotspot_y);
+	if (event->seat_client == seat->pointer_state.focused_client) {
+		last_cursor.shape = 0;
+		last_cursor.surface = event->surface;
+		last_cursor.hotspot_x = event->hotspot_x;
+		last_cursor.hotspot_y = event->hotspot_y;
+
+		if (!cursor_hidden)
+			wlr_cursor_set_surface(cursor, event->surface,
+					event->hotspot_x, event->hotspot_y);
+	}
 }
 
 void
@@ -2426,9 +2484,14 @@ setcursorshape(struct wl_listener *listener, void *data)
 	/* This can be sent by any client, so we check to make sure this one
 	 * actually has pointer focus first. If so, we can tell the cursor to
 	 * use the provided cursor shape. */
-	if (event->seat_client == seat->pointer_state.focused_client)
-		wlr_cursor_set_xcursor(cursor, cursor_mgr,
-				wlr_cursor_shape_v1_name(event->shape));
+	if (event->seat_client == seat->pointer_state.focused_client) {
+		last_cursor.shape = event->shape;
+		last_cursor.surface = NULL;
+
+		if (!cursor_hidden)
+			wlr_cursor_set_xcursor(cursor, cursor_mgr,
+					wlr_cursor_shape_v1_name(event->shape));
+	}
 }
 
 void
@@ -2719,6 +2782,9 @@ setup(void)
 	cursor_shape_mgr = wlr_cursor_shape_manager_v1_create(dpy, 1);
 	wl_signal_add(&cursor_shape_mgr->events.request_set_shape, &request_set_cursor_shape);
 
+	hide_source = wl_event_loop_add_timer(wl_display_get_event_loop(dpy),
+			hidecursor, cursor);
+
 	/*
 	 * Configures a seat, which is a single "seat" at which a user sits and
 	 * operates the computer. This conceptually includes up to one keyboard,
@@ -2776,6 +2842,44 @@ spawn(const Arg *arg)
 		execvp(((char **)arg->v)[0], (char **)arg->v);
 		die("dwl: execvp %s failed:", ((char **)arg->v)[0]);
 	}
+}
+
+void
+spawninfo(const Arg *arg)
+{
+	int fd[2];
+	pid_t pid;
+	const char *title, *appid;
+	Client *c = focustop(selmon);
+
+	if (pipe(fd) == -1)
+		return;
+	if ((pid = fork()) == -1)
+		return;
+	if (pid == 0) {
+		dup2(fd[0], STDIN_FILENO);
+		close(fd[0]);
+		close(fd[1]);
+		dup2(STDERR_FILENO, STDOUT_FILENO);
+		setsid();
+		execvp(((char **)arg->v)[0], (char **)arg->v);
+		die("dwl: execvp %s failed:", ((char **)arg->v)[0]);
+	}
+
+	close(fd[0]);
+
+	if (c) {
+		if (!(title = client_get_title(c)))
+			title = "";
+		if (!(appid = client_get_appid(c)))
+			appid = "";
+		dprintf(fd[1], "%d\n%s\n%s\n%"PRIu32"\n%d,%d %dx%d\n", c->pid,
+				title, appid, c->tags,
+				c->geom.x + c->bw, c->geom.y + c->bw,
+				c->geom.width - 2 * c->bw, c->geom.height - 2 * c->bw);
+	}
+
+	close(fd[1]);
 }
 
 void
@@ -3113,6 +3217,7 @@ virtualpointer(struct wl_listener *listener, void *data)
 	wlr_cursor_attach_input_device(cursor, device);
 	if (event->suggested_output)
 		wlr_cursor_map_input_to_output(cursor, device, event->suggested_output);
+	handlecursoractivity();
 }
 
 Monitor *
