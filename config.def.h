@@ -23,7 +23,15 @@ static int log_level = WLR_ERROR;
 
 /* Autostart */
 static const char *const autostart[] = {
-        "wbg", "/path/to/your/image", NULL,
+		"swww-daemon", NULL,
+		"hyprlock", NULL,
+		"hypridle", NULL,
+		"mako", NULL,
+		"wl-paste", "--type", "text", "--watch", "cliphist", "store", NULL,
+		"wl-paste", "--type", "image", "--watch", "cliphist", "store", NULL,
+		"swayosd-server", NULL,
+		"/bin/bash", "-c", "$HOME/.config/bash/battery-alert", NULL,
+		"/bin/bash", "-c", "$HOME/.config/bash/refresh", NULL,
         NULL /* terminate */
 };
 
