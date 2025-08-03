@@ -34,7 +34,7 @@ static const Env envs[] = {
 static const char *const autostart[] = {
 		"dbus-update-activation-environment", "WAYLAND_DISPLAY", "XDG_CURRENT_DESKTOP", NULL,
 		"pipewire", NULL,
-		"swww-daemon", NULL,
+		"swaybg", "-i", "$HOME/Wallpaper/active/rn", "-m", "\"fill\"", NULL, 
 		"hyprlock", NULL,
 		"hypridle", NULL,
 		"wl-paste", "--type", "text", "--watch", "cliphist", "store", NULL,
