@@ -174,6 +174,7 @@ static const char *colorpicker[] = { "hyprpicker", "-a", NULL };
 static const char *switchaudio[] = { "/bin/bash", "-c", "$HOME/.config/bin/switchaudio", NULL };
 static const char *screenshotscr[] = { "/bin/bash", "-c", "$HOME/.config/bash/screenshotscr", NULL };
 static const char *screenshotwin[] = { "/bin/bash", "-c", "$HOME/.config/bash/screenshotwin", NULL };
+static const char *wallpaperpick[] = { "/bin/bash", "-c", "$HOME/.config/bash/wallpaper-launcher", NULL };
 
 static const char *raisevolume[] = { "swayosd-client", "--output-volume", "+5", NULL };
 static const char *lowervolume[] = { "swayosd-client", "--output-volume", "-5", NULL };
@@ -200,11 +201,12 @@ static const Key keys[] = {
 	{ MODKEY,					 XKB_KEY_o,			 spawn,			 {.v = switchaudio} },
 	{ MODKEY,					 XKB_KEY_p,			 spawn,			 {.v = screenshotscr} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_P,			 spawninfo,		 {.v = screenshotwin} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_W,			 spawninfo,		 {.v = wallpaperpick} },
 	{ MODKEY,					 XKB_KEY_comma,		 spawn,			 {.v = lowervolume} },
 	{ MODKEY,					 XKB_KEY_period,	 spawn,			 {.v = raisevolume} },
 	{ MODKEY,					 XKB_KEY_m,			 spawn,			 {.v = muteoutput} },
-	{ MODKEY,					 XKB_KEY_less,		 spawn,			 {.v = lowerbright} },
-	{ MODKEY,					 XKB_KEY_greater,	 spawn,			 {.v = raisebright} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_less,		 spawn,			 {.v = lowerbright} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_greater,	 spawn,			 {.v = raisebright} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_M,			 spawn,			 {.v = muteinput} },
 	{ MODKEY,                    XKB_KEY_j,          focusstack,     {.i = -1} },
 	{ MODKEY,                    XKB_KEY_k,          focusstack,     {.i = +1} },
@@ -214,7 +216,7 @@ static const Key keys[] = {
 	{ MODKEY,                    XKB_KEY_l,          setmfact,       {.f = +0.05f} },
 	{ MODKEY,                    XKB_KEY_Return,     zoom,           {0} },
 	{ MODKEY,                    XKB_KEY_Tab,        view,           {0} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Q,          killclient,     {0} },
+	{ MODKEY,					 XKB_KEY_q,          killclient,     {0} },
 	/*
 	{ MODKEY,                    XKB_KEY_w,          setlayout,      {.v = &layouts[0]} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_W,          setlayout,      {.v = &layouts[1]} },
